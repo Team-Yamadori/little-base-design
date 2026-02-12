@@ -72,12 +72,12 @@ export const DEST_LABELS: Record<Destination, string> = {
 };
 
 export const DEST_COLORS: Record<Destination, { bg: string; text: string; activeBg: string }> = {
-  out: { bg: "bg-[hsl(0,50%,18%)]", text: "text-[hsl(0,80%,65%)]", activeBg: "bg-[hsl(0,60%,30%)]" },
-  "1B": { bg: "bg-[hsl(210,40%,18%)]", text: "text-[hsl(210,70%,70%)]", activeBg: "bg-[hsl(210,60%,30%)]" },
-  "2B": { bg: "bg-[hsl(180,35%,18%)]", text: "text-[hsl(180,60%,65%)]", activeBg: "bg-[hsl(180,50%,28%)]" },
-  "3B": { bg: "bg-[hsl(45,35%,18%)]", text: "text-[hsl(45,70%,65%)]", activeBg: "bg-[hsl(45,55%,28%)]" },
-  home: { bg: "bg-[hsl(38,50%,18%)]", text: "text-[hsl(38,100%,60%)]", activeBg: "bg-[hsl(38,70%,30%)]" },
-  stay: { bg: "bg-[hsl(210,25%,16%)]", text: "text-[hsl(210,20%,55%)]", activeBg: "bg-[hsl(210,30%,25%)]" },
+  out: { bg: "bg-[#FEF2F2]", text: "text-[#DC2626]", activeBg: "bg-[#FEE2E2]" },
+  "1B": { bg: "bg-[#EFF6FF]", text: "text-[#2563EB]", activeBg: "bg-[#DBEAFE]" },
+  "2B": { bg: "bg-[#ECFEFF]", text: "text-[#0891B2]", activeBg: "bg-[#CFFAFE]" },
+  "3B": { bg: "bg-[#FFFBEB]", text: "text-[#D97706]", activeBg: "bg-[#FEF3C7]" },
+  home: { bg: "bg-[#F0FDF4]", text: "text-[#16A34A]", activeBg: "bg-[#DCFCE7]" },
+  stay: { bg: "bg-[#F3F4F6]", text: "text-[#6B7280]", activeBg: "bg-[#E5E7EB]" },
 };
 
 export interface GameState {
