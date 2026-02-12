@@ -10,7 +10,6 @@ import {
 } from "@/lib/team-data";
 import { ArrowLeft, ArrowLeftRight } from "lucide-react";
 import { useState, useCallback } from "react";
-import { formatAvg, formatEra } from "@/lib/team-data";
 
 type SwapState =
   | { mode: "none" }
@@ -30,7 +29,6 @@ function DefenseSlot({
   onTap: () => void;
 }) {
   if (!player) return null;
-  const isPitcher = player.position === "投手";
 
   return (
     <button
@@ -44,6 +42,16 @@ function DefenseSlot({
           : "border border-[hsl(210,30%,18%)] bg-[hsl(210,50%,8%)]"
       }`}
     >
+      {/* Player info */}
+      <div className="flex flex-1 items-center gap-1.5 overflow-hidden">
+        <span className="text-[10px] font-bold tabular-nums text-[hsl(210,20%,50%)]">
+          #{player.number}
+        </span>
+        <span className="truncate text-xs font-black text-[hsl(48,100%,96%)]">
+          {player.name}
+        </span>
+      </div>
+
       {/* Position badge */}
       <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md bg-[hsl(210,60%,25%)]">
         <span className="text-[10px] font-black text-[hsl(48,100%,96%)]">
@@ -51,34 +59,8 @@ function DefenseSlot({
         </span>
       </div>
 
-      {/* Player info */}
-      <div className="flex flex-1 flex-col items-start overflow-hidden">
-        <div className="flex w-full items-baseline gap-1">
-          <span className="text-[10px] font-bold tabular-nums text-[hsl(210,20%,50%)]">
-            #{player.number}
-          </span>
-          <span className="truncate text-xs font-black text-[hsl(48,100%,96%)]">
-            {player.name}
-          </span>
-        </div>
-        <span className="text-[9px] text-[hsl(210,20%,42%)]">
-          本職: {player.position}
-          {player.subPositions?.length ? ` / ${player.subPositions.map((p) => POSITION_SHORT[p]).join("・")}` : ""}
-        </span>
-      </div>
-
-      {/* Stat */}
-      <div className="flex flex-col items-end">
-        <span className="text-[11px] font-bold tabular-nums text-[hsl(120,50%,55%)]">
-          {isPitcher ? formatEra(player.era ?? 0) : formatAvg(player.avg)}
-        </span>
-        <span className="text-[8px] text-[hsl(210,20%,42%)]">
-          {isPitcher ? "ERA" : "AVG"}
-        </span>
-      </div>
-
       {isSelected && (
-        <div className="ml-1 flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-[hsl(38,100%,50%)]">
+        <div className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-[hsl(38,100%,50%)]">
           <ArrowLeftRight size={12} className="text-[hsl(210,80%,8%)]" />
         </div>
       )}
@@ -91,7 +73,6 @@ export function DefenseScreen() {
   const team = state.myTeam;
   const [swapState, setSwapState] = useState<SwapState>({ mode: "none" });
 
-  // Build a list ordered by POSITION_ORDER
   const positionSlots = POSITION_ORDER.map((pos) => {
     const slotIdx = team.lineup.findIndex((s) => s.fieldPosition === pos);
     const slot = slotIdx >= 0 ? team.lineup[slotIdx] : null;
@@ -112,13 +93,11 @@ export function DefenseScreen() {
         const fromIdx = swapState.slotIndex;
         const toIdx = slotIdx;
 
-        // Swap the players between the two field positions
         updateMyTeam((t) => {
           const newLineup = [...t.lineup];
           const fromSlot = newLineup[fromIdx];
           const toSlot = newLineup[toIdx];
 
-          // Swap players but keep the field positions
           newLineup[fromIdx] = { playerId: toSlot.playerId, fieldPosition: fromSlot.fieldPosition };
           newLineup[toIdx] = { playerId: fromSlot.playerId, fieldPosition: toSlot.fieldPosition };
 
@@ -133,7 +112,7 @@ export function DefenseScreen() {
   return (
     <div className="flex min-h-dvh flex-col bg-[hsl(210,70%,6%)]">
       {/* Header */}
-      <div className="flex items-center border-b border-[hsl(210,40%,18%)] bg-[hsl(210,60%,8%)] px-3 py-3">
+      <div className="flex items-center border-b border-[hsl(210,40%,18%)] bg-[hsl(210,60%,8%)] px-3 py-2.5">
         <button
           type="button"
           onClick={() => navigate("lineup")}
@@ -150,14 +129,14 @@ export function DefenseScreen() {
 
       {/* Swap instruction */}
       {swapState.mode === "selected" ? (
-        <div className="flex items-center justify-center gap-2 bg-[hsl(38,25%,11%)] px-4 py-2">
+        <div className="flex items-center justify-center gap-2 bg-[hsl(38,25%,11%)] px-4 py-1.5">
           <ArrowLeftRight size={14} className="text-[hsl(38,100%,50%)]" />
           <span className="text-xs font-bold text-[hsl(38,100%,50%)]">
             入れ替えるポジションをタップ
           </span>
         </div>
       ) : (
-        <div className="flex items-center justify-center bg-[hsl(210,40%,9%)] px-4 py-2">
+        <div className="flex items-center justify-center bg-[hsl(210,40%,9%)] px-4 py-1.5">
           <span className="text-[10px] text-[hsl(210,20%,40%)]">
             選手をタップして守備位置を入れ替え
           </span>
@@ -177,7 +156,7 @@ export function DefenseScreen() {
           <div className="flex flex-col gap-1.5">
             {positionSlots.map(({ pos, slotIdx, player }) => {
               if (slotIdx < 0 || !player) return null;
-              const isSelected = swapState.mode === "selected" && swapState.slotIndex === slotIdx;
+              const isSelectedSlot = swapState.mode === "selected" && swapState.slotIndex === slotIdx;
               const isSwapTarget = swapState.mode === "selected" && swapState.slotIndex !== slotIdx;
 
               return (
@@ -185,7 +164,7 @@ export function DefenseScreen() {
                   key={pos}
                   position={pos}
                   player={player}
-                  isSelected={isSelected}
+                  isSelected={isSelectedSlot}
                   isSwapTarget={isSwapTarget}
                   onTap={() => handleTap(slotIdx)}
                 />

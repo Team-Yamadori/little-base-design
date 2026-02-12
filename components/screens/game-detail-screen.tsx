@@ -6,21 +6,15 @@ import { ArrowLeft } from "lucide-react";
 import { useState } from "react";
 
 export function GameDetailScreen() {
-  const { state, navigate, selectedGameId } = useAppContext();
+  const { state, goBack, selectedGameId } = useAppContext();
   const record = state.gameRecords.find((r) => r.id === selectedGameId);
   const [activeTab, setActiveTab] = useState<"score" | "batting" | "pitching">("score");
 
   if (!record) {
     return (
-      <div className="flex min-h-dvh flex-col items-center justify-center bg-[hsl(210,70%,6%)]">
-        <span className="text-sm text-[hsl(210,20%,50%)]">試合データが見つかりません</span>
-        <button
-          type="button"
-          onClick={() => navigate("score-history")}
-          className="mt-4 rounded-xl bg-[hsl(38,100%,45%)] px-6 py-2 text-sm font-bold text-[hsl(210,80%,8%)]"
-        >
-          戻る
-        </button>
+      <div className="flex min-h-dvh flex-col items-center justify-center bg-[#F8F9FB]">
+        <span className="text-sm text-[#6B7280]">{"試合データが見つかりません"}</span>
+        <button type="button" onClick={goBack} className="mt-4 rounded-xl bg-[#2563EB] px-6 py-2 text-sm font-bold text-white">{"戻る"}</button>
       </div>
     );
   }
@@ -29,147 +23,83 @@ export function GameDetailScreen() {
   const innings = Array.from({ length: Math.max(9, record.innings.away.length) }, (_, i) => i);
 
   return (
-    <div className="flex min-h-dvh flex-col bg-[hsl(210,70%,6%)]">
-      {/* Header */}
-      <div className="flex items-center border-b border-[hsl(210,40%,18%)] bg-[hsl(210,60%,8%)] px-3 py-3">
-        <button
-          type="button"
-          onClick={() => navigate("score-history")}
-          className="flex items-center gap-1 text-[hsl(210,20%,55%)] active:opacity-70"
-        >
-          <ArrowLeft size={18} />
-          <span className="text-xs font-bold">戻る</span>
+    <div className="flex min-h-dvh flex-col bg-[#F8F9FB]">
+      <div className="flex items-center border-b border-[#E5E7EB] bg-white px-3 py-3">
+        <button type="button" onClick={goBack} className="flex items-center gap-1 text-[#6B7280] active:opacity-70">
+          <ArrowLeft size={18} /><span className="text-xs font-bold">{"戻る"}</span>
         </button>
-        <h2 className="flex-1 text-center text-sm font-black text-[hsl(38,100%,50%)]">
-          試合詳細
-        </h2>
-        <span className="text-[10px] text-[hsl(210,20%,45%)]">{record.date}</span>
+        <h2 className="flex-1 text-center text-sm font-black text-[#1A1D23]">{"試合詳細"}</h2>
+        <span className="text-[10px] text-[#9CA3AF]">{record.date}</span>
       </div>
 
-      {/* Big Score Display */}
-      <div className="border-b border-[hsl(210,35%,18%)] bg-[hsl(210,55%,8%)] px-4 py-5">
+      {/* Big Score */}
+      <div className="border-b border-[#E5E7EB] bg-white px-4 py-5">
         <div className="flex items-center justify-center gap-6">
-          {/* Away */}
           <div className="flex flex-col items-center gap-1">
-            <div
-              className="flex h-12 w-12 items-center justify-center rounded-xl text-sm font-black text-[hsl(0,0%,100%)]"
-              style={{ backgroundColor: record.awayColor }}
-            >
-              {record.awayShort}
-            </div>
-            <span className="text-[10px] font-bold text-[hsl(210,20%,55%)]">{record.awayTeam}</span>
-            {!homeWin && (
-              <span className="rounded-md bg-[hsl(38,100%,50%)] px-2 py-0.5 text-[8px] font-black text-[hsl(210,80%,8%)]">WIN</span>
-            )}
+            <div className="flex h-12 w-12 items-center justify-center rounded-xl text-sm font-black text-white" style={{ backgroundColor: record.awayColor }}>{record.awayShort}</div>
+            <span className="text-[10px] font-bold text-[#6B7280]">{record.awayTeam}</span>
+            {!homeWin && <span className="rounded-md bg-[#2563EB] px-2 py-0.5 text-[8px] font-black text-white">WIN</span>}
           </div>
-          {/* Score */}
           <div className="flex items-baseline gap-4">
-            <span className={`text-5xl font-black tabular-nums ${!homeWin ? "text-[hsl(38,100%,50%)]" : "text-[hsl(48,100%,90%)]"}`}>
-              {record.awayScore}
-            </span>
-            <span className="text-2xl font-bold text-[hsl(210,25%,28%)]">-</span>
-            <span className={`text-5xl font-black tabular-nums ${homeWin ? "text-[hsl(38,100%,50%)]" : "text-[hsl(48,100%,90%)]"}`}>
-              {record.homeScore}
-            </span>
+            <span className={`text-5xl font-black tabular-nums ${!homeWin ? "text-[#2563EB]" : "text-[#1A1D23]"}`}>{record.awayScore}</span>
+            <span className="text-2xl font-bold text-[#D1D5DB]">-</span>
+            <span className={`text-5xl font-black tabular-nums ${homeWin ? "text-[#2563EB]" : "text-[#1A1D23]"}`}>{record.homeScore}</span>
           </div>
-          {/* Home */}
           <div className="flex flex-col items-center gap-1">
-            <div
-              className="flex h-12 w-12 items-center justify-center rounded-xl text-sm font-black text-[hsl(0,0%,100%)]"
-              style={{ backgroundColor: record.homeColor }}
-            >
-              {record.homeShort}
-            </div>
-            <span className="text-[10px] font-bold text-[hsl(210,20%,55%)]">{record.homeTeam}</span>
-            {homeWin && (
-              <span className="rounded-md bg-[hsl(38,100%,50%)] px-2 py-0.5 text-[8px] font-black text-[hsl(210,80%,8%)]">WIN</span>
-            )}
+            <div className="flex h-12 w-12 items-center justify-center rounded-xl text-sm font-black text-white" style={{ backgroundColor: record.homeColor }}>{record.homeShort}</div>
+            <span className="text-[10px] font-bold text-[#6B7280]">{record.homeTeam}</span>
+            {homeWin && <span className="rounded-md bg-[#2563EB] px-2 py-0.5 text-[8px] font-black text-white">WIN</span>}
           </div>
         </div>
       </div>
 
-      {/* Tab bar */}
-      <div className="flex border-b border-[hsl(210,40%,18%)]">
-        {([
-          { key: "score" as const, label: "スコア" },
-          { key: "batting" as const, label: "打撃成績" },
-          { key: "pitching" as const, label: "投手成績" },
-        ]).map((tab) => (
-          <button
-            key={tab.key}
-            type="button"
-            onClick={() => setActiveTab(tab.key)}
+      {/* Tabs */}
+      <div className="flex border-b border-[#E5E7EB] bg-white">
+        {([{ key: "score" as const, label: "スコア" }, { key: "batting" as const, label: "打撃成績" }, { key: "pitching" as const, label: "投手成績" }]).map((tab) => (
+          <button key={tab.key} type="button" onClick={() => setActiveTab(tab.key)}
             className={`flex-1 py-2.5 text-center text-xs font-black transition-colors ${
-              activeTab === tab.key
-                ? "border-b-2 border-[hsl(38,100%,50%)] text-[hsl(38,100%,50%)]"
-                : "text-[hsl(210,20%,45%)]"
-            }`}
-          >
-            {tab.label}
-          </button>
+              activeTab === tab.key ? "border-b-2 border-[#2563EB] text-[#2563EB]" : "text-[#9CA3AF]"
+            }`}>{tab.label}</button>
         ))}
       </div>
 
       {/* Content */}
       <div className="flex flex-1 flex-col overflow-y-auto px-3 py-3">
         {activeTab === "score" && (
-          <div className="flex flex-col gap-4">
-            {/* Full inning table */}
-            <div className="overflow-x-auto rounded-xl border border-[hsl(210,30%,18%)] bg-[hsl(210,50%,8%)]">
-              <table className="w-full min-w-[340px] border-collapse text-center">
-                <thead>
-                  <tr>
-                    <th className="sticky left-0 z-10 w-10 border-b border-r border-[hsl(210,30%,15%)] bg-[hsl(210,45%,10%)] py-2 text-[9px] text-[hsl(210,20%,40%)]">
-                      チーム
-                    </th>
-                    {innings.map((i) => (
-                      <th key={i} className="border-b border-r border-[hsl(210,30%,15%)] bg-[hsl(210,45%,10%)] py-2 text-[9px] text-[hsl(210,20%,40%)]">
-                        {i + 1}
-                      </th>
-                    ))}
-                    <th className="border-b border-r border-[hsl(210,30%,15%)] bg-[hsl(210,45%,10%)] py-2 text-[9px] font-bold text-[hsl(38,100%,50%)]">R</th>
-                    <th className="border-b border-r border-[hsl(210,30%,15%)] bg-[hsl(210,45%,10%)] py-2 text-[9px] text-[hsl(210,20%,40%)]">H</th>
-                    <th className="border-b border-[hsl(210,30%,15%)] bg-[hsl(210,45%,10%)] py-2 text-[9px] text-[hsl(210,20%,40%)]">E</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  <tr>
-                    <td className="sticky left-0 z-10 border-b border-r border-[hsl(210,30%,15%)] bg-[hsl(210,50%,8%)] py-2 text-[9px] font-black" style={{ color: record.awayColor }}>
-                      {record.awayShort}
-                    </td>
-                    {innings.map((i) => (
-                      <td key={i} className="border-b border-r border-[hsl(210,30%,15%)] py-2 text-[10px] tabular-nums text-[hsl(48,100%,90%)]">
-                        {record.innings.away[i] ?? ""}
-                      </td>
-                    ))}
-                    <td className="border-b border-r border-[hsl(210,30%,15%)] py-2 text-[11px] font-black tabular-nums text-[hsl(38,100%,50%)]">{record.awayScore}</td>
-                    <td className="border-b border-r border-[hsl(210,30%,15%)] py-2 text-[10px] tabular-nums text-[hsl(48,100%,90%)]">{record.awayHits}</td>
-                    <td className="border-b border-[hsl(210,30%,15%)] py-2 text-[10px] tabular-nums text-[hsl(0,60%,55%)]">{record.awayErrors}</td>
-                  </tr>
-                  <tr>
-                    <td className="sticky left-0 z-10 border-r border-[hsl(210,30%,15%)] bg-[hsl(210,50%,8%)] py-2 text-[9px] font-black" style={{ color: record.homeColor }}>
-                      {record.homeShort}
-                    </td>
-                    {innings.map((i) => (
-                      <td key={i} className="border-r border-[hsl(210,30%,15%)] py-2 text-[10px] tabular-nums text-[hsl(48,100%,90%)]">
-                        {record.innings.home[i] ?? ""}
-                      </td>
-                    ))}
-                    <td className="border-r border-[hsl(210,30%,15%)] py-2 text-[11px] font-black tabular-nums text-[hsl(38,100%,50%)]">{record.homeScore}</td>
-                    <td className="border-r border-[hsl(210,30%,15%)] py-2 text-[10px] tabular-nums text-[hsl(48,100%,90%)]">{record.homeHits}</td>
-                    <td className="py-2 text-[10px] tabular-nums text-[hsl(0,60%,55%)]">{record.homeErrors}</td>
-                  </tr>
-                </tbody>
-              </table>
-            </div>
+          <div className="overflow-x-auto rounded-xl border border-[#E5E7EB] bg-white shadow-sm">
+            <table className="w-full min-w-[340px] border-collapse text-center">
+              <thead>
+                <tr>
+                  <th className="sticky left-0 z-10 w-10 border-b border-r border-[#F3F4F6] bg-[#F8F9FB] py-2 text-[9px] text-[#9CA3AF]">{"チーム"}</th>
+                  {innings.map((i) => (<th key={i} className="border-b border-r border-[#F3F4F6] bg-[#F8F9FB] py-2 text-[9px] text-[#9CA3AF]">{i + 1}</th>))}
+                  <th className="border-b border-r border-[#F3F4F6] bg-[#F8F9FB] py-2 text-[9px] font-bold text-[#2563EB]">R</th>
+                  <th className="border-b border-r border-[#F3F4F6] bg-[#F8F9FB] py-2 text-[9px] text-[#9CA3AF]">H</th>
+                  <th className="border-b border-[#F3F4F6] bg-[#F8F9FB] py-2 text-[9px] text-[#9CA3AF]">E</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td className="sticky left-0 z-10 border-b border-r border-[#F3F4F6] bg-white py-2 text-[9px] font-black" style={{ color: record.awayColor }}>{record.awayShort}</td>
+                  {innings.map((i) => (<td key={i} className="border-b border-r border-[#F3F4F6] py-2 text-[10px] tabular-nums text-[#374151]">{record.innings.away[i] ?? ""}</td>))}
+                  <td className="border-b border-r border-[#F3F4F6] py-2 text-[11px] font-black tabular-nums text-[#2563EB]">{record.awayScore}</td>
+                  <td className="border-b border-r border-[#F3F4F6] py-2 text-[10px] tabular-nums text-[#374151]">{record.awayHits}</td>
+                  <td className="border-b border-[#F3F4F6] py-2 text-[10px] tabular-nums text-[#DC2626]">{record.awayErrors}</td>
+                </tr>
+                <tr>
+                  <td className="sticky left-0 z-10 border-r border-[#F3F4F6] bg-white py-2 text-[9px] font-black" style={{ color: record.homeColor }}>{record.homeShort}</td>
+                  {innings.map((i) => (<td key={i} className="border-r border-[#F3F4F6] py-2 text-[10px] tabular-nums text-[#374151]">{record.innings.home[i] ?? ""}</td>))}
+                  <td className="border-r border-[#F3F4F6] py-2 text-[11px] font-black tabular-nums text-[#2563EB]">{record.homeScore}</td>
+                  <td className="border-r border-[#F3F4F6] py-2 text-[10px] tabular-nums text-[#374151]">{record.homeHits}</td>
+                  <td className="py-2 text-[10px] tabular-nums text-[#DC2626]">{record.homeErrors}</td>
+                </tr>
+              </tbody>
+            </table>
           </div>
         )}
 
         {activeTab === "batting" && (
           <div className="flex flex-col gap-4">
-            {/* Away batting */}
             <BattingTable label={record.awayTeam} color={record.awayColor} players={record.awayLineup} />
-            {/* Home batting */}
             <BattingTable label={record.homeTeam} color={record.homeColor} players={record.homeLineup} />
           </div>
         )}
@@ -185,119 +115,61 @@ export function GameDetailScreen() {
   );
 }
 
-function BattingTable({
-  label,
-  color,
-  players,
-}: {
-  label: string;
-  color: string;
-  players: { name: string; pos: string; atBats: number; hits: number; rbi: number; avg: number }[];
-}) {
+function BattingTable({ label, color, players }: { label: string; color: string; players: { name: string; pos: string; atBats: number; hits: number; rbi: number; avg: number }[] }) {
   return (
-    <div className="overflow-hidden rounded-xl border border-[hsl(210,30%,18%)] bg-[hsl(210,50%,8%)]">
-      <div className="border-b border-[hsl(210,30%,15%)] bg-[hsl(210,45%,10%)] px-3 py-2">
-        <span className="text-xs font-black" style={{ color }}>{label}</span>
-      </div>
+    <div className="overflow-hidden rounded-xl border border-[#E5E7EB] bg-white shadow-sm">
+      <div className="border-b border-[#F3F4F6] bg-[#F8F9FB] px-3 py-2"><span className="text-xs font-black" style={{ color }}>{label}</span></div>
       <table className="w-full border-collapse text-center">
-        <thead>
-          <tr>
-            <th className="border-b border-r border-[hsl(210,30%,15%)] py-1.5 text-left pl-3 text-[8px] text-[hsl(210,20%,40%)]">打順</th>
-            <th className="border-b border-r border-[hsl(210,30%,15%)] py-1.5 text-[8px] text-[hsl(210,20%,40%)]">守</th>
-            <th className="border-b border-r border-[hsl(210,30%,15%)] py-1.5 text-left text-[8px] text-[hsl(210,20%,40%)]">選手名</th>
-            <th className="border-b border-r border-[hsl(210,30%,15%)] py-1.5 text-[8px] text-[hsl(210,20%,40%)]">打数</th>
-            <th className="border-b border-r border-[hsl(210,30%,15%)] py-1.5 text-[8px] text-[hsl(210,20%,40%)]">安打</th>
-            <th className="border-b border-r border-[hsl(210,30%,15%)] py-1.5 text-[8px] text-[hsl(210,20%,40%)]">打点</th>
-            <th className="border-b border-[hsl(210,30%,15%)] py-1.5 text-[8px] text-[hsl(210,20%,40%)]">打率</th>
+        <thead><tr>
+          <th className="border-b border-r border-[#F3F4F6] py-1.5 pl-3 text-left text-[8px] text-[#9CA3AF]">{"打順"}</th>
+          <th className="border-b border-r border-[#F3F4F6] py-1.5 text-[8px] text-[#9CA3AF]">{"守"}</th>
+          <th className="border-b border-r border-[#F3F4F6] py-1.5 text-left text-[8px] text-[#9CA3AF]">{"選手名"}</th>
+          <th className="border-b border-r border-[#F3F4F6] py-1.5 text-[8px] text-[#9CA3AF]">{"打数"}</th>
+          <th className="border-b border-r border-[#F3F4F6] py-1.5 text-[8px] text-[#9CA3AF]">{"安打"}</th>
+          <th className="border-b border-r border-[#F3F4F6] py-1.5 text-[8px] text-[#9CA3AF]">{"打点"}</th>
+          <th className="border-b border-[#F3F4F6] py-1.5 text-[8px] text-[#9CA3AF]">{"打率"}</th>
+        </tr></thead>
+        <tbody>{players.map((p, i) => (
+          <tr key={`${p.name}-${i}`}>
+            <td className={`border-r border-[#F3F4F6] py-1.5 pl-3 text-left text-[10px] font-bold text-[#2563EB] ${i < players.length - 1 ? "border-b" : ""}`}>{i + 1}</td>
+            <td className={`border-r border-[#F3F4F6] py-1.5 text-[10px] font-bold text-[#6B7280] ${i < players.length - 1 ? "border-b" : ""}`}>{p.pos}</td>
+            <td className={`border-r border-[#F3F4F6] py-1.5 pl-2 text-left text-[10px] font-bold text-[#1A1D23] ${i < players.length - 1 ? "border-b" : ""}`}>{p.name}</td>
+            <td className={`border-r border-[#F3F4F6] py-1.5 text-[10px] tabular-nums text-[#374151] ${i < players.length - 1 ? "border-b" : ""}`}>{p.atBats}</td>
+            <td className={`border-r border-[#F3F4F6] py-1.5 text-[10px] tabular-nums font-bold ${p.hits > 0 ? "text-[#16A34A]" : "text-[#374151]"} ${i < players.length - 1 ? "border-b" : ""}`}>{p.hits}</td>
+            <td className={`border-r border-[#F3F4F6] py-1.5 text-[10px] tabular-nums font-bold ${p.rbi > 0 ? "text-[#D97706]" : "text-[#374151]"} ${i < players.length - 1 ? "border-b" : ""}`}>{p.rbi}</td>
+            <td className={`py-1.5 text-[10px] tabular-nums text-[#6B7280] ${i < players.length - 1 ? "border-b border-[#F3F4F6]" : ""}`}>{formatAvg(p.avg)}</td>
           </tr>
-        </thead>
-        <tbody>
-          {players.map((p, i) => (
-            <tr key={`${p.name}-${i}`}>
-              <td className={`border-r border-[hsl(210,30%,15%)] py-1.5 pl-3 text-left text-[10px] font-bold text-[hsl(38,100%,50%)] ${i < players.length - 1 ? "border-b border-b-[hsl(210,30%,13%)]" : ""}`}>
-                {i + 1}
-              </td>
-              <td className={`border-r border-[hsl(210,30%,15%)] py-1.5 text-[10px] font-bold text-[hsl(210,60%,65%)] ${i < players.length - 1 ? "border-b border-b-[hsl(210,30%,13%)]" : ""}`}>
-                {p.pos}
-              </td>
-              <td className={`border-r border-[hsl(210,30%,15%)] py-1.5 text-left pl-2 text-[10px] font-bold text-[hsl(48,100%,96%)] ${i < players.length - 1 ? "border-b border-b-[hsl(210,30%,13%)]" : ""}`}>
-                {p.name}
-              </td>
-              <td className={`border-r border-[hsl(210,30%,15%)] py-1.5 text-[10px] tabular-nums text-[hsl(48,100%,90%)] ${i < players.length - 1 ? "border-b border-b-[hsl(210,30%,13%)]" : ""}`}>
-                {p.atBats}
-              </td>
-              <td className={`border-r border-[hsl(210,30%,15%)] py-1.5 text-[10px] tabular-nums font-bold ${p.hits > 0 ? "text-[hsl(120,50%,55%)]" : "text-[hsl(48,100%,90%)]"} ${i < players.length - 1 ? "border-b border-b-[hsl(210,30%,13%)]" : ""}`}>
-                {p.hits}
-              </td>
-              <td className={`border-r border-[hsl(210,30%,15%)] py-1.5 text-[10px] tabular-nums font-bold ${p.rbi > 0 ? "text-[hsl(38,100%,55%)]" : "text-[hsl(48,100%,90%)]"} ${i < players.length - 1 ? "border-b border-b-[hsl(210,30%,13%)]" : ""}`}>
-                {p.rbi}
-              </td>
-              <td className={`py-1.5 text-[10px] tabular-nums text-[hsl(210,30%,55%)] ${i < players.length - 1 ? "border-b border-b-[hsl(210,30%,13%)]" : ""}`}>
-                {formatAvg(p.avg)}
-              </td>
-            </tr>
-          ))}
-        </tbody>
+        ))}</tbody>
       </table>
     </div>
   );
 }
 
-function PitchingTable({
-  label,
-  color,
-  pitchers,
-}: {
-  label: string;
-  color: string;
-  pitchers: { name: string; ip: number; hits: number; er: number; so: number; bb: number; result: string }[];
-}) {
+function PitchingTable({ label, color, pitchers }: { label: string; color: string; pitchers: { name: string; ip: number; hits: number; er: number; so: number; bb: number; result: string }[] }) {
   return (
-    <div className="overflow-hidden rounded-xl border border-[hsl(210,30%,18%)] bg-[hsl(210,50%,8%)]">
-      <div className="border-b border-[hsl(210,30%,15%)] bg-[hsl(210,45%,10%)] px-3 py-2">
-        <span className="text-xs font-black" style={{ color }}>{label}</span>
-      </div>
+    <div className="overflow-hidden rounded-xl border border-[#E5E7EB] bg-white shadow-sm">
+      <div className="border-b border-[#F3F4F6] bg-[#F8F9FB] px-3 py-2"><span className="text-xs font-black" style={{ color }}>{label}</span></div>
       <table className="w-full border-collapse text-center">
-        <thead>
-          <tr>
-            <th className="border-b border-r border-[hsl(210,30%,15%)] py-1.5 text-left pl-3 text-[8px] text-[hsl(210,20%,40%)]">投手名</th>
-            <th className="border-b border-r border-[hsl(210,30%,15%)] py-1.5 text-[8px] text-[hsl(210,20%,40%)]">結果</th>
-            <th className="border-b border-r border-[hsl(210,30%,15%)] py-1.5 text-[8px] text-[hsl(210,20%,40%)]">投球回</th>
-            <th className="border-b border-r border-[hsl(210,30%,15%)] py-1.5 text-[8px] text-[hsl(210,20%,40%)]">被安</th>
-            <th className="border-b border-r border-[hsl(210,30%,15%)] py-1.5 text-[8px] text-[hsl(210,20%,40%)]">自責</th>
-            <th className="border-b border-r border-[hsl(210,30%,15%)] py-1.5 text-[8px] text-[hsl(210,20%,40%)]">奪三</th>
-            <th className="border-b border-[hsl(210,30%,15%)] py-1.5 text-[8px] text-[hsl(210,20%,40%)]">四球</th>
+        <thead><tr>
+          <th className="border-b border-r border-[#F3F4F6] py-1.5 pl-3 text-left text-[8px] text-[#9CA3AF]">{"投手名"}</th>
+          <th className="border-b border-r border-[#F3F4F6] py-1.5 text-[8px] text-[#9CA3AF]">{"結果"}</th>
+          <th className="border-b border-r border-[#F3F4F6] py-1.5 text-[8px] text-[#9CA3AF]">{"投球回"}</th>
+          <th className="border-b border-r border-[#F3F4F6] py-1.5 text-[8px] text-[#9CA3AF]">{"被安"}</th>
+          <th className="border-b border-r border-[#F3F4F6] py-1.5 text-[8px] text-[#9CA3AF]">{"自責"}</th>
+          <th className="border-b border-r border-[#F3F4F6] py-1.5 text-[8px] text-[#9CA3AF]">{"奪三"}</th>
+          <th className="border-b border-[#F3F4F6] py-1.5 text-[8px] text-[#9CA3AF]">{"四球"}</th>
+        </tr></thead>
+        <tbody>{pitchers.map((p, i) => (
+          <tr key={`${p.name}-${i}`}>
+            <td className={`border-r border-[#F3F4F6] py-1.5 pl-3 text-left text-[10px] font-bold text-[#1A1D23] ${i < pitchers.length - 1 ? "border-b" : ""}`}>{p.name}</td>
+            <td className={`border-r border-[#F3F4F6] py-1.5 text-[10px] font-black ${p.result === "W" ? "text-[#16A34A]" : p.result === "L" ? "text-[#DC2626]" : "text-[#9CA3AF]"} ${i < pitchers.length - 1 ? "border-b" : ""}`}>{p.result}</td>
+            <td className={`border-r border-[#F3F4F6] py-1.5 text-[10px] tabular-nums text-[#374151] ${i < pitchers.length - 1 ? "border-b" : ""}`}>{p.ip}</td>
+            <td className={`border-r border-[#F3F4F6] py-1.5 text-[10px] tabular-nums text-[#374151] ${i < pitchers.length - 1 ? "border-b" : ""}`}>{p.hits}</td>
+            <td className={`border-r border-[#F3F4F6] py-1.5 text-[10px] tabular-nums ${p.er > 0 ? "text-[#DC2626]" : "text-[#374151]"} ${i < pitchers.length - 1 ? "border-b" : ""}`}>{p.er}</td>
+            <td className={`border-r border-[#F3F4F6] py-1.5 text-[10px] tabular-nums font-bold text-[#D97706] ${i < pitchers.length - 1 ? "border-b" : ""}`}>{p.so}</td>
+            <td className={`py-1.5 text-[10px] tabular-nums text-[#374151] ${i < pitchers.length - 1 ? "border-b border-[#F3F4F6]" : ""}`}>{p.bb}</td>
           </tr>
-        </thead>
-        <tbody>
-          {pitchers.map((p, i) => (
-            <tr key={`${p.name}-${i}`}>
-              <td className={`border-r border-[hsl(210,30%,15%)] py-1.5 pl-3 text-left text-[10px] font-bold text-[hsl(48,100%,96%)] ${i < pitchers.length - 1 ? "border-b border-b-[hsl(210,30%,13%)]" : ""}`}>
-                {p.name}
-              </td>
-              <td className={`border-r border-[hsl(210,30%,15%)] py-1.5 text-[10px] font-black ${
-                p.result === "W" ? "text-[hsl(120,50%,55%)]" : p.result === "L" ? "text-[hsl(0,70%,55%)]" : "text-[hsl(210,20%,50%)]"
-              } ${i < pitchers.length - 1 ? "border-b border-b-[hsl(210,30%,13%)]" : ""}`}>
-                {p.result}
-              </td>
-              <td className={`border-r border-[hsl(210,30%,15%)] py-1.5 text-[10px] tabular-nums text-[hsl(48,100%,90%)] ${i < pitchers.length - 1 ? "border-b border-b-[hsl(210,30%,13%)]" : ""}`}>
-                {p.ip}
-              </td>
-              <td className={`border-r border-[hsl(210,30%,15%)] py-1.5 text-[10px] tabular-nums text-[hsl(48,100%,90%)] ${i < pitchers.length - 1 ? "border-b border-b-[hsl(210,30%,13%)]" : ""}`}>
-                {p.hits}
-              </td>
-              <td className={`border-r border-[hsl(210,30%,15%)] py-1.5 text-[10px] tabular-nums ${p.er > 0 ? "text-[hsl(0,70%,55%)]" : "text-[hsl(48,100%,90%)]"} ${i < pitchers.length - 1 ? "border-b border-b-[hsl(210,30%,13%)]" : ""}`}>
-                {p.er}
-              </td>
-              <td className={`border-r border-[hsl(210,30%,15%)] py-1.5 text-[10px] tabular-nums font-bold text-[hsl(38,100%,55%)] ${i < pitchers.length - 1 ? "border-b border-b-[hsl(210,30%,13%)]" : ""}`}>
-                {p.so}
-              </td>
-              <td className={`py-1.5 text-[10px] tabular-nums text-[hsl(48,100%,90%)] ${i < pitchers.length - 1 ? "border-b border-b-[hsl(210,30%,13%)]" : ""}`}>
-                {p.bb}
-              </td>
-            </tr>
-          ))}
-        </tbody>
+        ))}</tbody>
       </table>
     </div>
   );
