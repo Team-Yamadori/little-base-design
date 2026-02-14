@@ -161,14 +161,14 @@ export function useGame() {
         if (r3) slots.push({ from: "3B", label: "3塁走者", destination: "home", options: ["home", "stay"] });
         if (r2) slots.push({ from: "2B", label: "2塁走者", destination: "home", options: ["home", "3B"] });
         if (r1) slots.push({ from: "1B", label: "1塁走者", destination: "2B", options: ["2B", "3B", "home"] });
-        slots.push({ from: "batter", label: "打者", destination: "1B", options: ["1B", "2B", "3B"] });
+        slots.push({ from: "batter", label: "打者", destination: "1B", options: ["1B"] });
         return { actionLabel: "シングルヒット", slots, isHit: true, isError: false, defaultBatterDest: "1B" };
       }
       case "double": {
         if (r3) slots.push({ from: "3B", label: "3塁走者", destination: "home", options: ["home"] });
         if (r2) slots.push({ from: "2B", label: "2塁走者", destination: "home", options: ["home", "3B"] });
         if (r1) slots.push({ from: "1B", label: "1塁走者", destination: "3B", options: ["3B", "home"] });
-        slots.push({ from: "batter", label: "打者", destination: "2B", options: ["2B", "3B"] });
+        slots.push({ from: "batter", label: "打者", destination: "2B", options: ["2B"] });
         return { actionLabel: "二塁打", slots, isHit: true, isError: false, defaultBatterDest: "2B" };
       }
       case "groundout": {
