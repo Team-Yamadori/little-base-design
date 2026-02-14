@@ -161,14 +161,12 @@ export function useGame() {
         if (r3) slots.push({ from: "3B", label: "3塁走者", destination: "home", options: ["home", "stay"] });
         if (r2) slots.push({ from: "2B", label: "2塁走者", destination: "home", options: ["home", "3B"] });
         if (r1) slots.push({ from: "1B", label: "1塁走者", destination: "2B", options: ["2B", "3B", "home"] });
-        slots.push({ from: "batter", label: "打者", destination: "1B", options: ["1B"] });
         return { actionLabel: "シングルヒット", slots, isHit: true, isError: false, defaultBatterDest: "1B" };
       }
       case "double": {
         if (r3) slots.push({ from: "3B", label: "3塁走者", destination: "home", options: ["home"] });
         if (r2) slots.push({ from: "2B", label: "2塁走者", destination: "home", options: ["home", "3B"] });
         if (r1) slots.push({ from: "1B", label: "1塁走者", destination: "3B", options: ["3B", "home"] });
-        slots.push({ from: "batter", label: "打者", destination: "2B", options: ["2B"] });
         return { actionLabel: "二塁打", slots, isHit: true, isError: false, defaultBatterDest: "2B" };
       }
       case "groundout": {
@@ -329,13 +327,10 @@ export function useGame() {
       if (play.isHit) s = addHits(s, 1);
       if (play.isError) s = addErrors(s, 1);
 
-      // Task #5: Auto error detection for hits
+      // Auto-place batter for hits (batter slot is omitted from UI)
       if (play.isHit && play.defaultBatterDest) {
-        const batterSlot = play.slots.find((sl) => sl.from === "batter");
-        if (batterSlot && DEST_ORDER[batterSlot.destination] > DEST_ORDER[play.defaultBatterDest]) {
-          s = addErrors(s, 1);
-          showMessage("エラーが記録されました");
-        }
+        const baseIdx = play.defaultBatterDest === "1B" ? 0 : play.defaultBatterDest === "2B" ? 1 : 2;
+        newBases[baseIdx] = true;
       }
 
       if (play.preserveCount) {
