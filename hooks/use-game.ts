@@ -6,9 +6,13 @@ import {
   type Destination,
   type GameAction,
   type GameState,
+  type HitDirection,
+  type HistoryEntry,
+  type PendingFielding,
   type PendingPlay,
   type PlayerData,
   type RunnerSlot,
+  type StrikeoutType,
   initialGameState,
 } from "@/lib/game-state";
 
@@ -16,15 +20,27 @@ const batterNames = [
   "猪狩 守", "矢部 明雄", "六道 聖", "友沢 亮", "橘 みずき",
   "阿畑 やすし", "東條 小次郎", "冴木 創", "茂野 吾郎",
 ];
-const pitcherNames = [
-  "早川 あおい", "猪狩 進", "聖 エミリア", "涼風 希望", "木場 嵐士",
-];
+
+const ACTION_LABELS: Partial<Record<GameAction, string>> = {
+  ball: "ボール", strike: "ストライク", foul: "ファウル",
+  homerun: "ホームラン", triple: "三塁打",
+  "hit-by-pitch": "死球", walk: "四球", "intentional-walk": "敬遠",
+};
+
+const DEST_ORDER: Record<Destination, number> = {
+  out: -1, stay: 0, "1B": 1, "2B": 2, "3B": 3, home: 4,
+};
 
 export function useGame() {
   const [gameState, setGameState] = useState<GameState>(initialGameState);
   const [batterIndex, setBatterIndex] = useState(0);
   const [message, setMessage] = useState<string | null>(null);
   const [pendingPlay, setPendingPlay] = useState<PendingPlay | null>(null);
+  const [strikeoutPending, setStrikeoutPending] = useState(false);
+  const [pendingDirection, setPendingDirection] = useState<{ action: GameAction; label: string } | null>(null);
+  const [pendingFielding, setPendingFielding] = useState<PendingFielding | null>(null);
+  const [history, setHistory] = useState<HistoryEntry[]>([]);
+  const [undoConfirmPending, setUndoConfirmPending] = useState(false);
 
   const showMessage = useCallback((msg: string) => {
     setMessage(msg);
@@ -44,6 +60,35 @@ export function useGame() {
       avg: `.${Math.floor(Math.random() * 200 + 200)}`,
     };
   }, [batterIndex]);
+
+  // --- History helpers ---
+  const pushHistory = useCallback((label: string) => {
+    setHistory((prev) => [...prev, { state: gameState, batterIndex, label }]);
+  }, [gameState, batterIndex]);
+
+  const lastHistoryLabel = history.length > 0 ? history[history.length - 1].label : null;
+
+  const requestUndo = useCallback(() => {
+    if (history.length === 0) return;
+    setUndoConfirmPending(true);
+  }, [history.length]);
+
+  const confirmUndo = useCallback(() => {
+    setHistory((prev) => {
+      if (prev.length === 0) return prev;
+      const entry = prev[prev.length - 1];
+      setGameState(entry.state);
+      setBatterIndex(entry.batterIndex);
+      return prev.slice(0, -1);
+    });
+    setUndoConfirmPending(false);
+    setPendingPlay(null);
+    setPendingDirection(null);
+    setPendingFielding(null);
+    setStrikeoutPending(false);
+  }, []);
+
+  const cancelUndo = useCallback(() => setUndoConfirmPending(false), []);
 
   // --- State helpers ---
   const ensureInningScore = (s: GameState): GameState => {
@@ -99,10 +144,6 @@ export function useGame() {
     state = { ...state, home: { ...state.home, scores: homeScores } };
     const next = state.inning + 1;
     if (next > 9) {
-      if (state.home.runs !== state.away.runs) {
-        showMessage("試合終了!");
-        return { ...state, isPlaying: false, isGameOver: true };
-      }
       showMessage("試合終了!");
       return { ...state, isPlaying: false, isGameOver: true };
     }
@@ -120,15 +161,36 @@ export function useGame() {
         if (r3) slots.push({ from: "3B", label: "3塁走者", destination: "home", options: ["home", "stay"] });
         if (r2) slots.push({ from: "2B", label: "2塁走者", destination: "home", options: ["home", "3B"] });
         if (r1) slots.push({ from: "1B", label: "1塁走者", destination: "2B", options: ["2B", "3B", "home"] });
-        slots.push({ from: "batter", label: "打者", destination: "1B", options: ["1B", "2B"] });
-        return { actionLabel: "シングルヒット", slots, isHit: true, isError: false };
+        slots.push({ from: "batter", label: "打者", destination: "1B", options: ["1B", "2B", "3B"] });
+        return { actionLabel: "シングルヒット", slots, isHit: true, isError: false, defaultBatterDest: "1B" };
       }
       case "double": {
         if (r3) slots.push({ from: "3B", label: "3塁走者", destination: "home", options: ["home"] });
         if (r2) slots.push({ from: "2B", label: "2塁走者", destination: "home", options: ["home", "3B"] });
         if (r1) slots.push({ from: "1B", label: "1塁走者", destination: "3B", options: ["3B", "home"] });
-        slots.push({ from: "batter", label: "打者", destination: "2B", options: ["2B"] });
-        return { actionLabel: "二塁打", slots, isHit: true, isError: false };
+        slots.push({ from: "batter", label: "打者", destination: "2B", options: ["2B", "3B"] });
+        return { actionLabel: "二塁打", slots, isHit: true, isError: false, defaultBatterDest: "2B" };
+      }
+      case "groundout": {
+        if (r3) slots.push({ from: "3B", label: "3塁走者", destination: "stay", options: ["stay", "home", "out"] });
+        if (r2) slots.push({ from: "2B", label: "2塁走者", destination: "stay", options: ["stay", "3B", "home", "out"] });
+        if (r1) slots.push({ from: "1B", label: "1塁走者", destination: "stay", options: ["stay", "2B", "3B", "out"] });
+        slots.push({ from: "batter", label: "打者", destination: "out", options: ["out"] });
+        return { actionLabel: "ゴロ", slots, isHit: false, isError: false };
+      }
+      case "flyout": {
+        if (r3) slots.push({ from: "3B", label: "3塁走者", destination: "stay", options: ["stay", "home", "out"] });
+        if (r2) slots.push({ from: "2B", label: "2塁走者", destination: "stay", options: ["stay", "3B", "out"] });
+        if (r1) slots.push({ from: "1B", label: "1塁走者", destination: "stay", options: ["stay", "2B", "out"] });
+        slots.push({ from: "batter", label: "打者", destination: "out", options: ["out"] });
+        return { actionLabel: "フライ", slots, isHit: false, isError: false };
+      }
+      case "lineout": {
+        if (r3) slots.push({ from: "3B", label: "3塁走者", destination: "stay", options: ["stay", "home", "out"] });
+        if (r2) slots.push({ from: "2B", label: "2塁走者", destination: "stay", options: ["stay", "3B", "out"] });
+        if (r1) slots.push({ from: "1B", label: "1塁走者", destination: "stay", options: ["stay", "2B", "out"] });
+        slots.push({ from: "batter", label: "打者", destination: "out", options: ["out"] });
+        return { actionLabel: "ライナー", slots, isHit: false, isError: false };
       }
       case "sacrifice-fly": {
         if (!r3) return null;
@@ -136,7 +198,7 @@ export function useGame() {
         if (r2) slots.push({ from: "2B", label: "2塁走者", destination: "stay", options: ["stay", "3B"] });
         if (r1) slots.push({ from: "1B", label: "1塁走者", destination: "stay", options: ["stay", "2B"] });
         slots.push({ from: "batter", label: "打者", destination: "out", options: ["out"] });
-        return { actionLabel: "犠牲フライ", slots, isHit: false, isError: false };
+        return { actionLabel: "犠飛", slots, isHit: false, isError: false };
       }
       case "sacrifice-bunt": {
         if (!hasRunners) return null;
@@ -146,18 +208,8 @@ export function useGame() {
         slots.push({ from: "batter", label: "打者", destination: "out", options: ["out", "1B"] });
         return { actionLabel: "犠打", slots, isHit: false, isError: false };
       }
-      case "double-play": {
-        if (!hasRunners || state.outs >= 2) return null;
-        // Batter is always out. Pick which runner is also out.
-        if (r3) slots.push({ from: "3B", label: "3塁走者", destination: "stay", options: ["out", "home", "stay"] });
-        if (r2) slots.push({ from: "2B", label: "2塁走者", destination: "stay", options: ["out", "3B", "stay"] });
-        if (r1) slots.push({ from: "1B", label: "1塁走者", destination: "out", options: ["out", "2B"] });
-        slots.push({ from: "batter", label: "打者", destination: "out", options: ["out"] });
-        return { actionLabel: "併殺 (ゲッツー)", slots, isHit: false, isError: false };
-      }
       case "fielders-choice": {
         if (!hasRunners) return null;
-        // Batter reaches 1st, pick which runner is out
         if (r3) slots.push({ from: "3B", label: "3塁走者", destination: "stay", options: ["out", "home", "stay"] });
         if (r2) slots.push({ from: "2B", label: "2塁走者", destination: "3B", options: ["out", "3B", "stay"] });
         if (r1) slots.push({ from: "1B", label: "1塁走者", destination: "out", options: ["out", "2B", "3B"] });
@@ -166,33 +218,45 @@ export function useGame() {
       }
       case "stolen-base": {
         if (!hasRunners) return null;
-        // Each runner can steal (advance 1) or stay
         if (r3) slots.push({ from: "3B", label: "3塁走者", destination: "stay", options: ["home", "stay"] });
         if (r2) slots.push({ from: "2B", label: "2塁走者", destination: "3B", options: ["3B", "stay"] });
         if (r1) slots.push({ from: "1B", label: "1塁走者", destination: "2B", options: ["2B", "stay"] });
-        return { actionLabel: "盗塁", slots, isHit: false, isError: false };
+        return { actionLabel: "盗塁", slots, isHit: false, isError: false, preserveCount: true };
       }
       case "caught-stealing": {
         if (!hasRunners) return null;
-        // Each runner can be caught (out) or stay
         if (r3) slots.push({ from: "3B", label: "3塁走者", destination: "stay", options: ["out", "stay"] });
         if (r2) slots.push({ from: "2B", label: "2塁走者", destination: "stay", options: ["out", "stay"] });
         if (r1) slots.push({ from: "1B", label: "1塁走者", destination: "out", options: ["out", "stay"] });
-        return { actionLabel: "盗塁失敗", slots, isHit: false, isError: false };
+        return { actionLabel: "盗塁失敗", slots, isHit: false, isError: false, preserveCount: true };
       }
       case "wild-pitch": {
         if (!hasRunners) return null;
         if (r3) slots.push({ from: "3B", label: "3塁走者", destination: "home", options: ["home", "stay"] });
         if (r2) slots.push({ from: "2B", label: "2塁走者", destination: "3B", options: ["3B", "home", "stay"] });
         if (r1) slots.push({ from: "1B", label: "1塁走者", destination: "2B", options: ["2B", "3B"] });
-        return { actionLabel: "暴投", slots, isHit: false, isError: false };
+        return { actionLabel: "暴投", slots, isHit: false, isError: false, preserveCount: true };
+      }
+      case "passed-ball": {
+        if (!hasRunners) return null;
+        if (r3) slots.push({ from: "3B", label: "3塁走者", destination: "home", options: ["home", "stay"] });
+        if (r2) slots.push({ from: "2B", label: "2塁走者", destination: "3B", options: ["3B", "home", "stay"] });
+        if (r1) slots.push({ from: "1B", label: "1塁走者", destination: "2B", options: ["2B", "3B"] });
+        return { actionLabel: "捕逸", slots, isHit: false, isError: false, preserveCount: true };
       }
       case "balk": {
         if (!hasRunners) return null;
         if (r3) slots.push({ from: "3B", label: "3塁走者", destination: "home", options: ["home"] });
         if (r2) slots.push({ from: "2B", label: "2塁走者", destination: "3B", options: ["3B"] });
         if (r1) slots.push({ from: "1B", label: "1塁走者", destination: "2B", options: ["2B"] });
-        return { actionLabel: "ボーク", slots, isHit: false, isError: false };
+        return { actionLabel: "ボーク", slots, isHit: false, isError: false, preserveCount: true };
+      }
+      case "runner-out": {
+        if (!hasRunners) return null;
+        if (r3) slots.push({ from: "3B", label: "3塁走者", destination: "stay", options: ["out", "stay"] });
+        if (r2) slots.push({ from: "2B", label: "2塁走者", destination: "stay", options: ["out", "stay"] });
+        if (r1) slots.push({ from: "1B", label: "1塁走者", destination: "stay", options: ["out", "stay"] });
+        return { actionLabel: "走塁アウト", slots, isHit: false, isError: false, preserveCount: true };
       }
       case "error": {
         if (r3) slots.push({ from: "3B", label: "3塁走者", destination: "home", options: ["home", "stay"] });
@@ -200,6 +264,34 @@ export function useGame() {
         if (r1) slots.push({ from: "1B", label: "1塁走者", destination: "2B", options: ["2B", "3B", "home"] });
         slots.push({ from: "batter", label: "打者", destination: "1B", options: ["1B", "2B", "3B"] });
         return { actionLabel: "エラー", slots, isHit: false, isError: true };
+      }
+      case "dropped-third-strike": {
+        if (r3) slots.push({ from: "3B", label: "3塁走者", destination: "stay", options: ["home", "stay"] });
+        if (r2) slots.push({ from: "2B", label: "2塁走者", destination: "stay", options: ["3B", "stay"] });
+        if (r1) slots.push({ from: "1B", label: "1塁走者", destination: "stay", options: ["2B", "stay"] });
+        slots.push({ from: "batter", label: "打者", destination: "1B", options: ["1B", "out"] });
+        return { actionLabel: "振り逃げ", slots, isHit: false, isError: false };
+      }
+      case "catcher-interference": {
+        if (r3) slots.push({ from: "3B", label: "3塁走者", destination: "stay", options: ["home", "stay"] });
+        if (r2) slots.push({ from: "2B", label: "2塁走者", destination: "stay", options: ["3B", "stay"] });
+        if (r1) slots.push({ from: "1B", label: "1塁走者", destination: "2B", options: ["2B", "stay"] });
+        slots.push({ from: "batter", label: "打者", destination: "1B", options: ["1B"] });
+        return { actionLabel: "打撃妨害", slots, isHit: false, isError: false };
+      }
+      case "obstruction": {
+        if (!hasRunners) return null;
+        if (r3) slots.push({ from: "3B", label: "3塁走者", destination: "stay", options: ["home", "stay"] });
+        if (r2) slots.push({ from: "2B", label: "2塁走者", destination: "stay", options: ["3B", "home", "stay"] });
+        if (r1) slots.push({ from: "1B", label: "1塁走者", destination: "stay", options: ["2B", "3B", "stay"] });
+        return { actionLabel: "走塁妨害", slots, isHit: false, isError: false, preserveCount: true };
+      }
+      case "offensive-interference": {
+        if (!hasRunners) return null;
+        if (r3) slots.push({ from: "3B", label: "3塁走者", destination: "stay", options: ["out", "stay"] });
+        if (r2) slots.push({ from: "2B", label: "2塁走者", destination: "stay", options: ["out", "stay"] });
+        if (r1) slots.push({ from: "1B", label: "1塁走者", destination: "stay", options: ["out", "stay"] });
+        return { actionLabel: "守備妨害", slots, isHit: false, isError: false, preserveCount: true };
       }
       default:
         return null;
@@ -214,7 +306,6 @@ export function useGame() {
       let runs = 0;
       let outs = s.outs;
 
-      // Process each slot
       for (const slot of play.slots) {
         const dest = slot.destination;
         if (dest === "out") {
@@ -228,7 +319,6 @@ export function useGame() {
         } else if (dest === "3B") {
           newBases[2] = true;
         } else if (dest === "stay") {
-          // Stay at current base
           if (slot.from === "1B") newBases[0] = true;
           if (slot.from === "2B") newBases[1] = true;
           if (slot.from === "3B") newBases[2] = true;
@@ -239,7 +329,20 @@ export function useGame() {
       if (play.isHit) s = addHits(s, 1);
       if (play.isError) s = addErrors(s, 1);
 
-      s = { ...resetCount(s), outs, bases: newBases, currentBatter: nextBatter() };
+      // Task #5: Auto error detection for hits
+      if (play.isHit && play.defaultBatterDest) {
+        const batterSlot = play.slots.find((sl) => sl.from === "batter");
+        if (batterSlot && DEST_ORDER[batterSlot.destination] > DEST_ORDER[play.defaultBatterDest]) {
+          s = addErrors(s, 1);
+          showMessage("エラーが記録されました");
+        }
+      }
+
+      if (play.preserveCount) {
+        s = { ...s, outs, bases: newBases };
+      } else {
+        s = { ...resetCount(s), outs, bases: newBases, currentBatter: nextBatter() };
+      }
 
       if (runs > 0) {
         showMessage(runs >= 2 ? `${runs}点!` : "得点!");
@@ -256,15 +359,122 @@ export function useGame() {
     setPendingPlay(null);
   }, [nextBatter, checkThreeOuts, showMessage]);
 
+  // --- Direction selection (for hits) ---
+  const resolveDirection = useCallback((direction: HitDirection) => {
+    if (!pendingDirection) return;
+    const { action, label } = pendingDirection;
+    setPendingDirection(null);
+
+    // HR and triple: apply immediately
+    if (action === "homerun" || action === "triple") {
+      pushHistory(label);
+      setGameState((prev) => {
+        let s = ensureInningScore(prev);
+        if (action === "homerun") {
+          const on = (s.bases[0] ? 1 : 0) + (s.bases[1] ? 1 : 0) + (s.bases[2] ? 1 : 0);
+          const scored = on + 1;
+          showMessage(scored === 4 ? "満塁ホームラン!!" : scored >= 2 ? `${scored}ランHR!` : "ソロホームラン!");
+          s = addRuns(s, scored);
+          s = addHits(s, 1);
+          return { ...resetCount(s), bases: [false, false, false], currentBatter: nextBatter() };
+        }
+        // triple
+        let r = 0;
+        if (s.bases[0]) r++; if (s.bases[1]) r++; if (s.bases[2]) r++;
+        showMessage("三塁打!");
+        s = addRuns(s, r);
+        s = addHits(s, 1);
+        return { ...resetCount(s), bases: [false, false, true], currentBatter: nextBatter() };
+      });
+      return;
+    }
+
+    // Single/double: proceed to runner resolution
+    const play = buildPendingPlay(action as ComplexAction, gameState);
+    if (!play) return;
+    play.hitDirection = direction;
+
+    const allSingle = play.slots.every((sl) => sl.options.length <= 1);
+    if (allSingle) {
+      pushHistory(label);
+      resolvePlay(play);
+    } else {
+      setPendingPlay(play);
+    }
+  }, [pendingDirection, gameState, buildPendingPlay, resolvePlay, pushHistory, nextBatter, showMessage]);
+
+  const cancelDirection = useCallback(() => setPendingDirection(null), []);
+
+  // --- Fielding number selection (for outs) ---
+  const updateFieldingNumbers = useCallback((numbers: number[]) => {
+    setPendingFielding((prev) => prev ? { ...prev, numbers } : null);
+  }, []);
+
+  const confirmFielding = useCallback(() => {
+    if (!pendingFielding) return;
+    const { action, actionLabel, numbers } = pendingFielding;
+    setPendingFielding(null);
+
+    const play = buildPendingPlay(action, gameState);
+    if (!play) return;
+    play.fieldingNumbers = numbers;
+    play.actionLabel = `${actionLabel} ${numbers.join("→")}`;
+
+    const allSingle = play.slots.every((sl) => sl.options.length <= 1);
+    if (allSingle) {
+      pushHistory(play.actionLabel);
+      resolvePlay(play);
+    } else {
+      setPendingPlay(play);
+    }
+  }, [pendingFielding, gameState, buildPendingPlay, resolvePlay, pushHistory]);
+
+  const cancelFielding = useCallback(() => setPendingFielding(null), []);
+
   // --- Handle action from controls ---
   const handleAction = useCallback((action: GameAction) => {
     if (gameState.isGameOver && action !== "reset") return;
 
-    // Check if complex action
+    // Check for strikeout
+    if (action === "strike" && gameState.strikes >= 2) {
+      setStrikeoutPending(true);
+      return;
+    }
+
+    // Hit actions → direction selection first
+    const hitActions: GameAction[] = ["single", "double", "homerun", "triple"];
+    if (hitActions.includes(action)) {
+      const label = ACTION_LABELS[action] ?? action;
+      setPendingDirection({ action, label });
+      return;
+    }
+
+    // Out actions → fielding number selection first
+    const fieldingActions: ComplexAction[] = ["groundout", "flyout", "lineout", "sacrifice-fly", "sacrifice-bunt"];
+    if (fieldingActions.includes(action as ComplexAction)) {
+      const labelMap: Record<string, string> = {
+        groundout: "ゴロ", flyout: "フライ", lineout: "ライナー",
+        "sacrifice-fly": "犠飛", "sacrifice-bunt": "犠打",
+      };
+      // Check preconditions
+      if (action === "sacrifice-fly" && !gameState.bases[2]) {
+        showMessage("3塁走者がいません");
+        return;
+      }
+      if (action === "sacrifice-bunt" && !gameState.bases[0] && !gameState.bases[1] && !gameState.bases[2]) {
+        showMessage("走者がいません");
+        return;
+      }
+      setPendingFielding({ action: action as ComplexAction, actionLabel: labelMap[action] ?? action, numbers: [] });
+      return;
+    }
+
+    // Other complex actions → runner resolution directly
     const complexActions: ComplexAction[] = [
-      "single", "double", "sacrifice-fly", "sacrifice-bunt",
-      "double-play", "fielders-choice", "stolen-base", "caught-stealing",
-      "wild-pitch", "balk", "error",
+      "fielders-choice", "stolen-base", "caught-stealing",
+      "wild-pitch", "passed-ball", "balk", "runner-out",
+      "error", "dropped-third-strike", "catcher-interference",
+      "obstruction", "offensive-interference",
     ];
 
     if (complexActions.includes(action as ComplexAction)) {
@@ -273,9 +483,9 @@ export function useGame() {
         showMessage("走者がいません");
         return;
       }
-      // If every slot has only 1 option, auto-resolve
       const allSingle = play.slots.every((sl) => sl.options.length <= 1);
       if (allSingle) {
+        pushHistory(play.actionLabel);
         resolvePlay(play);
       } else {
         setPendingPlay(play);
@@ -284,6 +494,9 @@ export function useGame() {
     }
 
     // Simple instant actions
+    const label = ACTION_LABELS[action];
+    if (label && action !== "reset") pushHistory(label);
+
     setGameState((prev) => {
       let s = ensureInningScore(prev);
       switch (action) {
@@ -299,13 +512,6 @@ export function useGame() {
         }
         case "strike": {
           const ns = s.strikes + 1;
-          if (ns >= 3) {
-            showMessage("三振!");
-            const no = s.outs + 1;
-            s = { ...resetCount(s), outs: no, currentBatter: nextBatter() };
-            if (no >= 3) { showMessage("チェンジ!"); return checkThreeOuts(s); }
-            return s;
-          }
           return { ...s, strikes: ns };
         }
         case "foul": {
@@ -313,37 +519,14 @@ export function useGame() {
           showMessage("ファウル!");
           return s;
         }
-        case "homerun": {
-          const on = (s.bases[0] ? 1 : 0) + (s.bases[1] ? 1 : 0) + (s.bases[2] ? 1 : 0);
-          const scored = on + 1;
-          showMessage(scored === 4 ? "満塁ホームラン!!" : scored >= 2 ? `${scored}ランHR!` : "ソロホームラン!");
-          s = addRuns(s, scored);
-          s = addHits(s, 1);
-          return { ...resetCount(s), bases: [false, false, false], currentBatter: nextBatter() };
-        }
-        case "triple": {
-          let r = 0;
-          if (s.bases[0]) r++; if (s.bases[1]) r++; if (s.bases[2]) r++;
-          showMessage("三塁打!");
-          s = addRuns(s, r);
-          s = addHits(s, 1);
-          return { ...resetCount(s), bases: [false, false, true], currentBatter: nextBatter() };
-        }
-        case "out": {
-          showMessage("アウト!");
-          const no = s.outs + 1;
-          s = { ...resetCount(s), outs: no, currentBatter: nextBatter() };
-          if (no >= 3) { showMessage("チェンジ!"); return checkThreeOuts(s); }
-          return s;
-        }
-        case "walk": {
-          showMessage("フォアボール!");
+        case "hit-by-pitch": {
+          showMessage("死球!");
           const { newBases, runs } = forceAdvance(s.bases);
           s = addRuns(s, runs);
           return { ...resetCount(s), bases: newBases, currentBatter: nextBatter() };
         }
-        case "hit-by-pitch": {
-          showMessage("死球!");
+        case "walk": {
+          showMessage("フォアボール!");
           const { newBases, runs } = forceAdvance(s.bases);
           s = addRuns(s, runs);
           return { ...resetCount(s), bases: newBases, currentBatter: nextBatter() };
@@ -357,13 +540,14 @@ export function useGame() {
         case "reset": {
           showMessage("リセット!");
           setBatterIndex(0);
+          setHistory([]);
           return initialGameState;
         }
         default:
           return s;
       }
     });
-  }, [gameState, buildPendingPlay, resolvePlay, nextBatter, checkThreeOuts, showMessage]);
+  }, [gameState, buildPendingPlay, resolvePlay, pushHistory, nextBatter, showMessage]);
 
   const updatePendingSlot = useCallback((slotIndex: number, dest: Destination) => {
     setPendingPlay((prev) => {
@@ -375,19 +559,50 @@ export function useGame() {
     });
   }, []);
 
+  const resolveStrikeout = useCallback((type: StrikeoutType) => {
+    const label = type === "swinging" ? "空振り三振" : "見逃し三振";
+    pushHistory(label);
+    showMessage(`${label}!`);
+    setGameState((prev) => {
+      let s = ensureInningScore(prev);
+      const no = s.outs + 1;
+      s = { ...resetCount(s), outs: no, currentBatter: nextBatter() };
+      if (no >= 3) { showMessage("チェンジ!"); return checkThreeOuts(s); }
+      return s;
+    });
+    setStrikeoutPending(false);
+  }, [pushHistory, nextBatter, checkThreeOuts, showMessage]);
+
   const cancelPending = useCallback(() => setPendingPlay(null), []);
 
   const confirmPending = useCallback(() => {
-    if (pendingPlay) resolvePlay(pendingPlay);
-  }, [pendingPlay, resolvePlay]);
+    if (pendingPlay) {
+      pushHistory(pendingPlay.actionLabel);
+      resolvePlay(pendingPlay);
+    }
+  }, [pendingPlay, resolvePlay, pushHistory]);
 
   return {
     gameState,
     message,
     pendingPlay,
+    strikeoutPending,
+    pendingDirection,
+    pendingFielding,
+    undoConfirmPending,
+    lastHistoryLabel,
     handleAction,
     updatePendingSlot,
     cancelPending,
     confirmPending,
+    resolveStrikeout,
+    resolveDirection,
+    cancelDirection,
+    updateFieldingNumbers,
+    confirmFielding,
+    cancelFielding,
+    requestUndo,
+    confirmUndo,
+    cancelUndo,
   };
 }

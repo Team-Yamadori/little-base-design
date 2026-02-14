@@ -8,7 +8,9 @@ import { GameControls } from "@/components/scoreboard/game-controls";
 import { InningBoard } from "@/components/scoreboard/inning-board";
 import { PlayerInfo } from "@/components/scoreboard/player-info";
 import { RunnerResolution } from "@/components/scoreboard/runner-resolution";
-import { ArrowLeft, Clock, X, UserRoundPlus, Footprints, Shield, GripVertical } from "lucide-react";
+import { HitDirectionSelection } from "@/components/scoreboard/hit-direction-selection";
+import { FieldingNumberSelection } from "@/components/scoreboard/fielding-number-selection";
+import { ArrowLeft, Clock, Undo2, X, UserRoundPlus, Footprints, Shield, GripVertical } from "lucide-react";
 import { getPlayer, POSITION_SHORT, type Team } from "@/lib/team-data";
 import { useState, useCallback, useEffect, useRef } from "react";
 
@@ -530,7 +532,14 @@ function DefenseChangePanel({
 // ===== Main Game Screen =====
 export function GameScreen() {
   const { state, navigate, updateMyTeam, addGameRecord, setActiveGameState } = useAppContext();
-  const { gameState, message, pendingPlay, handleAction, updatePendingSlot, cancelPending, confirmPending } = useGame();
+  const {
+    gameState, message, pendingPlay, strikeoutPending,
+    pendingDirection, pendingFielding, undoConfirmPending, lastHistoryLabel,
+    handleAction, updatePendingSlot, cancelPending, confirmPending,
+    resolveStrikeout, resolveDirection, cancelDirection,
+    updateFieldingNumbers, confirmFielding, cancelFielding,
+    requestUndo, confirmUndo, cancelUndo,
+  } = useGame();
 
   const [timeoutMenu, setTimeoutMenu] = useState(false);
   const [pinchHitMode, setPinchHitMode] = useState(false);
@@ -618,11 +627,20 @@ export function GameScreen() {
           <ArrowLeft size={16} />
           <span className="text-[10px] font-bold">メニュー</span>
         </button>
-        <button type="button" onClick={() => setTimeoutMenu(true)}
-          className="flex items-center gap-1.5 rounded-lg border border-[#2563EB] bg-[#EFF6FF] px-3 py-1.5 text-[10px] font-black text-[#2563EB] active:bg-[#DBEAFE]">
-          <Clock size={13} />
-          タイム
-        </button>
+        <div className="flex items-center gap-2">
+          <button type="button" onClick={requestUndo} disabled={!lastHistoryLabel}
+            className={`flex items-center gap-1 rounded-lg border px-3 py-1.5 text-[10px] font-black active:bg-[#E5E7EB] ${
+              lastHistoryLabel ? "border-[#6B7280] bg-[#F3F4F6] text-[#6B7280]" : "border-[#E5E7EB] bg-[#F9FAFB] text-[#D1D5DB]"
+            }`}>
+            <Undo2 size={13} />
+            戻る
+          </button>
+          <button type="button" onClick={() => setTimeoutMenu(true)}
+            className="flex items-center gap-1.5 rounded-lg border border-[#2563EB] bg-[#EFF6FF] px-3 py-1.5 text-[10px] font-black text-[#2563EB] active:bg-[#DBEAFE]">
+            <Clock size={13} />
+            タイム
+          </button>
+        </div>
       </div>
 
       <div className="flex w-full flex-1 flex-col">
@@ -670,7 +688,45 @@ export function GameScreen() {
         <GameControls gameState={gameState} onAction={handleAction} />
       </div>
 
+      {pendingDirection && (
+        <HitDirectionSelection
+          actionLabel={pendingDirection.label}
+          onSelect={resolveDirection}
+          onCancel={cancelDirection}
+        />
+      )}
+      {pendingFielding && (
+        <FieldingNumberSelection
+          actionLabel={pendingFielding.actionLabel}
+          numbers={pendingFielding.numbers}
+          onUpdate={updateFieldingNumbers}
+          onConfirm={confirmFielding}
+          onCancel={cancelFielding}
+        />
+      )}
       {pendingPlay && <RunnerResolution play={pendingPlay} onUpdate={updatePendingSlot} onCancel={cancelPending} onConfirm={confirmPending} />}
+      {strikeoutPending && (
+        <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/30">
+          <div className="w-full max-w-md animate-[slideUp_0.25s_ease-out] rounded-t-2xl border-t-2 border-[#DC2626] bg-white shadow-xl">
+            <div className="flex items-center justify-between border-b border-[#E5E7EB] px-4 py-3">
+              <span className="text-sm font-black text-[#DC2626]">三振</span>
+              <span className="text-[10px] font-bold text-[#9CA3AF]">種類を選択</span>
+            </div>
+            <div className="flex gap-3 px-4 py-4">
+              <button type="button" onClick={() => resolveStrikeout("swinging")}
+                className="flex flex-1 flex-col items-center rounded-xl border border-[#E5E7EB] bg-[#FEF2F2] py-4 active:scale-95">
+                <span className="text-lg font-black text-[#DC2626]">空振り</span>
+                <span className="mt-1 text-[10px] font-bold text-[#9CA3AF]">三振</span>
+              </button>
+              <button type="button" onClick={() => resolveStrikeout("looking")}
+                className="flex flex-1 flex-col items-center rounded-xl border border-[#E5E7EB] bg-[#FFFBEB] py-4 active:scale-95">
+                <span className="text-lg font-black text-[#D97706]">見逃し</span>
+                <span className="mt-1 text-[10px] font-bold text-[#9CA3AF]">三振</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
       {timeoutMenu && <TimeoutMenu hasRunners={hasRunners} onSelect={handleTimeoutSelect} onClose={() => setTimeoutMenu(false)} />}
       {pinchHitMode && <PinchHitPanel team={state.myTeam} currentBatterIndex={currentBatterIndex} onSubstitute={handlePinchHit} onClose={() => setPinchHitMode(false)} />}
       {pinchRunMode && <PinchRunPanel team={state.myTeam} bases={gameState.bases} onSubstitute={handlePinchRun} onClose={() => setPinchRunMode(false)} />}
@@ -680,6 +736,27 @@ export function GameScreen() {
         <div className="pointer-events-none fixed inset-0 z-50 flex items-center justify-center">
           <div className="animate-bounce rounded-2xl border-2 border-[#2563EB] bg-white px-8 py-4 shadow-xl">
             <span className="text-2xl font-black text-[#2563EB]">{message}</span>
+          </div>
+        </div>
+      )}
+
+      {undoConfirmPending && lastHistoryLabel && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30">
+          <div className="w-[300px] animate-[slideUp_0.2s_ease-out] rounded-2xl bg-white p-6 shadow-xl">
+            <p className="text-center text-sm font-bold text-[#1A1D23]">
+              <span className="font-black text-[#DC2626]">{lastHistoryLabel}</span>
+              <span className="mt-1 block text-[#6B7280]">の操作が消えます。よろしいですか？</span>
+            </p>
+            <div className="mt-4 flex gap-3">
+              <button type="button" onClick={cancelUndo}
+                className="flex-1 rounded-xl bg-[#F3F4F6] py-3 text-sm font-black text-[#6B7280] active:scale-95">
+                いいえ
+              </button>
+              <button type="button" onClick={confirmUndo}
+                className="flex-1 rounded-xl bg-[#DC2626] py-3 text-sm font-black text-white active:scale-95">
+                はい
+              </button>
+            </div>
           </div>
         </div>
       )}

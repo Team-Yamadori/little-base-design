@@ -31,6 +31,10 @@ export interface PendingPlay {
   slots: RunnerSlot[];
   isHit: boolean;
   isError: boolean;
+  preserveCount?: boolean;
+  hitDirection?: HitDirection;
+  fieldingNumbers?: number[];
+  defaultBatterDest?: Destination;
 }
 
 // Simple instant actions
@@ -40,9 +44,8 @@ export type SimpleAction =
   | "foul"
   | "homerun"
   | "triple"
-  | "out"
-  | "walk"
   | "hit-by-pitch"
+  | "walk"
   | "intentional-walk"
   | "reset";
 
@@ -50,15 +53,39 @@ export type SimpleAction =
 export type ComplexAction =
   | "single"
   | "double"
+  | "groundout"
+  | "flyout"
+  | "lineout"
   | "sacrifice-fly"
   | "sacrifice-bunt"
-  | "double-play"
   | "fielders-choice"
   | "stolen-base"
   | "caught-stealing"
   | "wild-pitch"
+  | "passed-ball"
   | "balk"
-  | "error";
+  | "runner-out"
+  | "error"
+  | "dropped-third-strike"
+  | "catcher-interference"
+  | "obstruction"
+  | "offensive-interference";
+
+export type StrikeoutType = "swinging" | "looking";
+
+export type HitDirection = "投" | "捕" | "一" | "二" | "三" | "遊" | "左" | "中" | "右";
+
+export interface PendingFielding {
+  action: ComplexAction;
+  actionLabel: string;
+  numbers: number[];
+}
+
+export interface HistoryEntry {
+  state: GameState;
+  batterIndex: number;
+  label: string;
+}
 
 export type GameAction = SimpleAction | ComplexAction;
 
