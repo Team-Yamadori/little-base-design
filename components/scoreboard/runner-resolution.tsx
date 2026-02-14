@@ -33,6 +33,8 @@ const FROM_ORDER: Record<string, number> = { batter: 0, "1B": 1, "2B": 2, "3B": 
 
 const DEST_VALUE: Record<string, number> = { "1B": 1, "2B": 2, "3B": 3, home: 4 };
 
+const OPTION_ORDER: Record<string, number> = { stay: 0, "1B": 1, "2B": 2, "3B": 3, home: 4, out: 5 };
+
 function getEffectiveBase(slot: RunnerSlot): number | null {
   const d = slot.destination;
   if (d === "out" || d === "home") return null;
@@ -81,7 +83,8 @@ export function RunnerResolution({ play, onUpdate, onCancel, onConfirm }: Runner
 
         <div className="flex flex-col gap-2 px-4 py-3">
           {sortedSlots.map(({ slot, originalIndex }, sortedIdx) => {
-            const filteredOptions = getFilteredOptions(sortedIdx, sortedSlots);
+            const filteredOptions = getFilteredOptions(sortedIdx, sortedSlots)
+              .sort((a, b) => (OPTION_ORDER[a] ?? 0) - (OPTION_ORDER[b] ?? 0));
             if (filteredOptions.length === 0) return null;
 
             return (
