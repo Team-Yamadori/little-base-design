@@ -173,7 +173,7 @@ export function useGame() {
         if (r3) slots.push({ from: "3B", label: "3塁走者", destination: "stay", options: ["stay", "home", "out"] });
         if (r2) slots.push({ from: "2B", label: "2塁走者", destination: "stay", options: ["stay", "3B", "home", "out"] });
         if (r1) slots.push({ from: "1B", label: "1塁走者", destination: "stay", options: ["stay", "2B", "3B", "out"] });
-        slots.push({ from: "batter", label: "打者", destination: "out", options: ["out"] });
+        slots.push({ from: "batter", label: "打者", destination: "out", options: ["out", "1B"] });
         return { actionLabel: "ゴロ", slots, isHit: false, isError: false };
       }
       case "flyout": {
@@ -203,7 +203,7 @@ export function useGame() {
         if (r3) slots.push({ from: "3B", label: "3塁走者", destination: "home", options: ["home", "stay"] });
         if (r2) slots.push({ from: "2B", label: "2塁走者", destination: "3B", options: ["3B", "home", "stay"] });
         if (r1) slots.push({ from: "1B", label: "1塁走者", destination: "2B", options: ["2B", "3B"] });
-        slots.push({ from: "batter", label: "打者", destination: "out", options: ["out", "1B"] });
+        slots.push({ from: "batter", label: "打者", destination: "out", options: ["out", "1B", "2B"] });
         return { actionLabel: "犠打", slots, isHit: false, isError: false };
       }
       case "fielders-choice": {
