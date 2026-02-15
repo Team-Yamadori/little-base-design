@@ -12,6 +12,7 @@ export function Scoreboard() {
   const {
     gameState,
     message,
+    playSeq,
     pendingPlay,
     handleAction,
     updatePendingSlot,
@@ -114,7 +115,7 @@ export function Scoreboard() {
       </div>
 
       {/* Controls */}
-      <GameControls gameState={gameState} onAction={handleAction} />
+      <GameControls key={playSeq} gameState={gameState} onAction={handleAction} />
 
       {/* Runner Resolution Sheet */}
       {pendingPlay && (

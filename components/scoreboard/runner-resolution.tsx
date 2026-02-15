@@ -5,7 +5,6 @@ import {
   DEST_COLORS,
   DEST_LABELS,
   type PendingPlay,
-  type RunnerSlot,
 } from "@/lib/game-state";
 
 interface RunnerResolutionProps {
@@ -31,41 +30,7 @@ const FROM_COLORS: Record<string, string> = {
 
 const FROM_ORDER: Record<string, number> = { batter: 0, "1B": 1, "2B": 2, "3B": 3 };
 
-const DEST_VALUE: Record<string, number> = { "1B": 1, "2B": 2, "3B": 3, home: 4 };
-
 const OPTION_ORDER: Record<string, number> = { stay: 0, "1B": 1, "2B": 2, "3B": 3, home: 4, out: 5 };
-
-function getEffectiveBase(slot: RunnerSlot): number | null {
-  const d = slot.destination;
-  if (d === "out" || d === "home") return null;
-  if (d === "stay") return FROM_ORDER[slot.from] ?? null;
-  return DEST_VALUE[d] ?? null;
-}
-
-function getFilteredOptions(
-  sortedIdx: number,
-  sortedSlots: { slot: RunnerSlot; originalIndex: number }[],
-): Destination[] {
-  const { slot } = sortedSlots[sortedIdx];
-
-  // Find the closest occupied base among runners ahead (higher index = closer to home)
-  let minAheadBase: number | null = null;
-  for (let j = sortedIdx + 1; j < sortedSlots.length; j++) {
-    const pos = getEffectiveBase(sortedSlots[j].slot);
-    if (pos !== null && (minAheadBase === null || pos < minAheadBase)) {
-      minAheadBase = pos;
-    }
-  }
-
-  if (minAheadBase === null) return slot.options;
-
-  return slot.options.filter((opt) => {
-    if (opt === "out" || opt === "stay") return true;
-    const val = DEST_VALUE[opt];
-    if (val === undefined) return true;
-    return val < minAheadBase;
-  });
-}
 
 export function RunnerResolution({ play, onUpdate, onCancel, onConfirm }: RunnerResolutionProps) {
   // Sort: batter → 1B → 2B → 3B
@@ -82,10 +47,9 @@ export function RunnerResolution({ play, onUpdate, onCancel, onConfirm }: Runner
         </div>
 
         <div className="flex flex-col gap-2 px-4 py-3">
-          {sortedSlots.map(({ slot, originalIndex }, sortedIdx) => {
-            const filteredOptions = getFilteredOptions(sortedIdx, sortedSlots)
+          {sortedSlots.map(({ slot, originalIndex }) => {
+            const sortedOptions = [...slot.options]
               .sort((a, b) => (OPTION_ORDER[a] ?? 0) - (OPTION_ORDER[b] ?? 0));
-            if (filteredOptions.length === 0) return null;
 
             return (
               <div key={slot.from} className="flex items-center gap-2">
@@ -96,7 +60,7 @@ export function RunnerResolution({ play, onUpdate, onCancel, onConfirm }: Runner
                   <path d="M3 8h8M8 5l3 3-3 3" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
                 </svg>
                 <div className="flex flex-1 gap-1.5">
-                  {filteredOptions.map((opt) => {
+                  {sortedOptions.map((opt) => {
                     const selected = slot.destination === opt;
                     const colors = DEST_COLORS[opt];
                     return (

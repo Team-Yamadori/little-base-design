@@ -533,7 +533,7 @@ function DefenseChangePanel({
 export function GameScreen() {
   const { state, navigate, updateMyTeam, addGameRecord, setActiveGameState } = useAppContext();
   const {
-    gameState, message, pendingPlay, strikeoutPending,
+    gameState, message, playSeq, pendingPlay, strikeoutPending,
     pendingDirection, pendingFielding, undoConfirmPending, lastHistoryLabel,
     handleAction, updatePendingSlot, cancelPending, confirmPending,
     resolveStrikeout, resolveDirection, cancelDirection,
@@ -685,7 +685,7 @@ export function GameScreen() {
           <BaseDiamond bases={gameState.bases} size="lg" />
         </div>
 
-        <GameControls gameState={gameState} onAction={handleAction} />
+        <GameControls key={playSeq} gameState={gameState} onAction={handleAction} />
       </div>
 
       {pendingDirection && (
