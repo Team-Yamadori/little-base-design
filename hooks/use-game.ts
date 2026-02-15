@@ -31,6 +31,47 @@ const DEST_ORDER: Record<Destination, number> = {
   out: -1, stay: 0, "1B": 1, "2B": 2, "3B": 3, home: 4,
 };
 
+const FROM_POS: Record<string, number> = { batter: 0, "1B": 1, "2B": 2, "3B": 3 };
+const DEST_BASE: Record<string, number | null> = { "1B": 1, "2B": 2, "3B": 3, home: 4, out: null };
+const BASE_TO_DEST: Record<number, Destination> = { 1: "1B", 2: "2B", 3: "3B", 4: "home" };
+
+function getSlotBase(slot: RunnerSlot): number | null {
+  if (slot.destination === "out") return null;
+  return DEST_BASE[slot.destination] ?? null;
+}
+
+function cascadeSlots(slots: RunnerSlot[], fromIndex = -1): void {
+  const sorted = slots
+    .map((_, i) => i)
+    .sort((a, b) => (FROM_POS[slots[a].from] ?? 0) - (FROM_POS[slots[b].from] ?? 0));
+
+  const startIdx = fromIndex === -1 ? 0 : Math.max(0, sorted.indexOf(fromIndex));
+
+  // Forward: push ahead runners forward if behind runner overtakes them
+  for (let si = startIdx; si < sorted.length - 1; si++) {
+    const behindBase = getSlotBase(slots[sorted[si]]);
+    const aheadIdx = sorted[si + 1];
+    const aheadBase = getSlotBase(slots[aheadIdx]);
+    if (behindBase === null || aheadBase === null) continue;
+    if (aheadBase <= behindBase) {
+      slots[aheadIdx] = { ...slots[aheadIdx], destination: BASE_TO_DEST[behindBase + 1] ?? "home" };
+    }
+  }
+
+  // Backward: push behind runners back if ahead runner moves behind them
+  if (fromIndex !== -1) {
+    for (let si = startIdx; si > 0; si--) {
+      const aheadBase = getSlotBase(slots[sorted[si]]);
+      const behindIdx = sorted[si - 1];
+      const behindBase = getSlotBase(slots[behindIdx]);
+      if (aheadBase === null || behindBase === null) continue;
+      if (behindBase >= aheadBase) {
+        slots[behindIdx] = { ...slots[behindIdx], destination: BASE_TO_DEST[aheadBase - 1] ?? "1B" };
+      }
+    }
+  }
+}
+
 export function useGame() {
   const [gameState, setGameState] = useState<GameState>(initialGameState);
   const [batterIndex, setBatterIndex] = useState(0);
@@ -162,13 +203,15 @@ export function useGame() {
         if (r3) slots.push({ from: "3B", label: "3塁走者", destination: "home", options: ["home", "3B"] });
         if (r2) slots.push({ from: "2B", label: "2塁走者", destination: "3B", options: ["3B", "home"] });
         if (r1) slots.push({ from: "1B", label: "1塁走者", destination: "2B", options: ["2B", "3B", "home"] });
-        return { actionLabel: "シングルヒット", slots, isHit: true, isError: false, defaultBatterDest: "1B" };
+        slots.push({ from: "batter", label: "打者", destination: "1B", options: ["1B"] });
+        return { actionLabel: "シングルヒット", slots, isHit: true, isError: false };
       }
       case "double": {
         if (r3) slots.push({ from: "3B", label: "3塁走者", destination: "home", options: ["home"] });
         if (r2) slots.push({ from: "2B", label: "2塁走者", destination: "3B", options: ["3B", "home"] });
         if (r1) slots.push({ from: "1B", label: "1塁走者", destination: "3B", options: ["3B", "home"] });
-        return { actionLabel: "二塁打", slots, isHit: true, isError: false, defaultBatterDest: "2B" };
+        slots.push({ from: "batter", label: "打者", destination: "2B", options: ["2B"] });
+        return { actionLabel: "二塁打", slots, isHit: true, isError: false };
       }
       case "groundout": {
         if (r3) slots.push({ from: "3B", label: "3塁走者", destination: "3B", options: ["3B", "home", "out"] });
@@ -297,6 +340,13 @@ export function useGame() {
     }
   }, []);
 
+  // Apply cascade to fix conflicting initial defaults
+  const buildPendingPlayCascaded = useCallback((action: ComplexAction, state: GameState): PendingPlay | null => {
+    const play = buildPendingPlay(action, state);
+    if (play) cascadeSlots(play.slots);
+    return play;
+  }, [buildPendingPlay]);
+
   // --- Resolve the pending play ---
   const resolvePlay = useCallback((play: PendingPlay) => {
     setGameState((prev) => {
@@ -328,11 +378,6 @@ export function useGame() {
       if (play.isHit) s = addHits(s, 1);
       if (play.isError) s = addErrors(s, 1);
 
-      // Auto-place batter for hits (batter slot is omitted from UI)
-      if (play.isHit && play.defaultBatterDest) {
-        const baseIdx = play.defaultBatterDest === "1B" ? 0 : play.defaultBatterDest === "2B" ? 1 : 2;
-        newBases[baseIdx] = true;
-      }
 
       if (play.preserveCount) {
         s = { ...s, outs, bases: newBases };
@@ -388,7 +433,7 @@ export function useGame() {
     }
 
     // Single/double: proceed to runner resolution
-    const play = buildPendingPlay(action as ComplexAction, gameState);
+    const play = buildPendingPlayCascaded(action as ComplexAction, gameState);
     if (!play) return;
     play.hitDirection = direction;
 
@@ -399,7 +444,7 @@ export function useGame() {
     } else {
       setPendingPlay(play);
     }
-  }, [pendingDirection, gameState, buildPendingPlay, resolvePlay, pushHistory, nextBatter, showMessage]);
+  }, [pendingDirection, gameState, buildPendingPlayCascaded, resolvePlay, pushHistory, nextBatter, showMessage]);
 
   const cancelDirection = useCallback(() => setPendingDirection(null), []);
 
@@ -413,7 +458,7 @@ export function useGame() {
     const { action, actionLabel, numbers } = pendingFielding;
     setPendingFielding(null);
 
-    const play = buildPendingPlay(action, gameState);
+    const play = buildPendingPlayCascaded(action, gameState);
     if (!play) return;
     play.fieldingNumbers = numbers;
     play.actionLabel = `${actionLabel} ${numbers.join("→")}`;
@@ -425,7 +470,7 @@ export function useGame() {
     } else {
       setPendingPlay(play);
     }
-  }, [pendingFielding, gameState, buildPendingPlay, resolvePlay, pushHistory]);
+  }, [pendingFielding, gameState, buildPendingPlayCascaded, resolvePlay, pushHistory]);
 
   const cancelFielding = useCallback(() => setPendingFielding(null), []);
 
@@ -476,7 +521,7 @@ export function useGame() {
     ];
 
     if (complexActions.includes(action as ComplexAction)) {
-      const play = buildPendingPlay(action as ComplexAction, gameState);
+      const play = buildPendingPlayCascaded(action as ComplexAction, gameState);
       if (!play) {
         showMessage("走者がいません");
         return;
@@ -551,42 +596,22 @@ export function useGame() {
     });
 
     if (completesPlay) setPlaySeq((s) => s + 1);
-  }, [gameState, buildPendingPlay, resolvePlay, pushHistory, nextBatter, showMessage]);
+  }, [gameState, buildPendingPlayCascaded, resolvePlay, pushHistory, nextBatter, showMessage]);
 
   const updatePendingSlot = useCallback((slotIndex: number, dest: Destination) => {
-    const FROM_POS: Record<string, number> = { batter: 0, "1B": 1, "2B": 2, "3B": 3 };
-    const DEST_VAL: Record<string, number | null> = { "1B": 1, "2B": 2, "3B": 3, home: 4, out: null };
-    const VAL_TO_DEST: Record<number, Destination> = { 1: "1B", 2: "2B", 3: "3B", 4: "home" };
-
-    const getBase = (slot: RunnerSlot): number | null => {
-      if (slot.destination === "out" || slot.destination === "home") return null;
-      return DEST_VAL[slot.destination] ?? null;
-    };
-
     setPendingPlay((prev) => {
       if (!prev) return null;
       const newSlots = prev.slots.map((sl, i) =>
         i === slotIndex ? { ...sl, destination: dest } : sl,
       );
+      cascadeSlots(newSlots, slotIndex);
 
-      // Sort slot indices by original position (batter→1B→2B→3B)
-      const sorted = newSlots
-        .map((_, i) => i)
-        .sort((a, b) => (FROM_POS[newSlots[a].from] ?? 0) - (FROM_POS[newSlots[b].from] ?? 0));
-
-      // Cascade: from behind toward home, push each ahead runner 1 base if conflict
-      const startIdx = sorted.indexOf(slotIndex);
-      for (let si = startIdx; si < sorted.length - 1; si++) {
-        const behindIdx = sorted[si];
-        const aheadIdx = sorted[si + 1];
-        const behindBase = getBase(newSlots[behindIdx]);
-        const aheadBase = getBase(newSlots[aheadIdx]);
-        if (behindBase === null || aheadBase === null) continue;
-        if (aheadBase <= behindBase) {
-          const newBase = behindBase + 1;
-          newSlots[aheadIdx] = { ...newSlots[aheadIdx], destination: VAL_TO_DEST[newBase] ?? "home" };
-        }
-      }
+      // Validate: no duplicate bases & all destinations must be in options
+      const occupiedBases = newSlots
+        .map((sl) => getSlotBase(sl))
+        .filter((b): b is number => b !== null && b < 4);
+      if (new Set(occupiedBases).size !== occupiedBases.length) return prev;
+      if (!newSlots.every((sl) => sl.options.includes(sl.destination))) return prev;
 
       return { ...prev, slots: newSlots };
     });
