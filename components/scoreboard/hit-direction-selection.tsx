@@ -5,6 +5,7 @@ import type { HitDirection } from "@/lib/game-state";
 
 interface HitDirectionSelectionProps {
   actionLabel: string;
+  showInfieldOption?: boolean;
   onSelect: (direction: HitDirection) => void;
   onCancel: () => void;
 }
@@ -18,7 +19,7 @@ const infieldPositions: { dir: HitDirection; label: string }[] = [
   { dir: "遊", label: "遊" },
 ];
 
-export function HitDirectionSelection({ actionLabel, onSelect, onCancel }: HitDirectionSelectionProps) {
+export function HitDirectionSelection({ actionLabel, showInfieldOption = true, onSelect, onCancel }: HitDirectionSelectionProps) {
   const [showInfield, setShowInfield] = useState(false);
 
   return (
@@ -70,13 +71,15 @@ export function HitDirectionSelection({ actionLabel, onSelect, onCancel }: HitDi
                   <span className="text-xl font-black text-[#16A34A]">右</span>
                 </button>
               </div>
-              <button
-                type="button"
-                onClick={() => setShowInfield(true)}
-                className="flex items-center justify-center rounded-xl border border-[#E5E7EB] bg-[#EFF6FF] py-3 transition-all active:scale-95"
-              >
-                <span className="text-xl font-black text-[#2563EB]">内野</span>
-              </button>
+              {showInfieldOption && (
+                <button
+                  type="button"
+                  onClick={() => setShowInfield(true)}
+                  className="flex items-center justify-center rounded-xl border border-[#E5E7EB] bg-[#EFF6FF] py-3 transition-all active:scale-95"
+                >
+                  <span className="text-xl font-black text-[#2563EB]">内野</span>
+                </button>
+              )}
             </div>
           )}
         </div>

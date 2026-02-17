@@ -691,6 +691,7 @@ export function GameScreen() {
       {pendingDirection && (
         <HitDirectionSelection
           actionLabel={pendingDirection.label}
+          showInfieldOption={pendingDirection.action === "single"}
           onSelect={resolveDirection}
           onCancel={cancelDirection}
         />
